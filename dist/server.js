@@ -1,5 +1,6 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod"; // Add zod import for schema validation
 import pg from 'pg';
 const server = new McpServer({
     name: "cockroachdb",
@@ -18,7 +19,7 @@ const pool = new pg.Pool({
     connectionString: databaseUrl,
 });
 // Add a resource for listing databases
-server.resource("databases", new ResourceTemplate("postgres://{host}/databases", { list: async () => {
+server.resource("databases", new ResourceTemplate("postgres://{host}/databases/{database}", { list: async () => {
         const client = await pool.connect();
         try {
             const result = await client.query(`SELECT name 
@@ -38,16 +39,30 @@ server.resource("databases", new ResourceTemplate("postgres://{host}/databases",
     } }), async (uri, params) => {
     const client = await pool.connect();
     try {
-        // Get database details from CRDB internal tables
+        // Get database details from CRDB internal tables with all available fields
         const result = await client.query(`SELECT 
+          id,
+          name,
           owner,
-          version 
+          primary_region,
+          secondary_region,
+          regions,
+          survival_goal,
+          placement_policy,
+          create_statement
          FROM crdb_internal.databases 
          WHERE name = $1`, [params.database]);
+        // Include all fields in the response
         const dbInfo = {
+            id: result.rows[0]?.id,
             name: params.database,
             owner: result.rows[0]?.owner,
-            version: result.rows[0]?.version,
+            primary_region: result.rows[0]?.primary_region,
+            secondary_region: result.rows[0]?.secondary_region,
+            regions: result.rows[0]?.regions,
+            survival_goal: result.rows[0]?.survival_goal,
+            placement_policy: result.rows[0]?.placement_policy,
+            create_statement: result.rows[0]?.create_statement,
         };
         return {
             contents: [{
@@ -109,6 +124,59 @@ server.resource("schema", new ResourceTemplate("postgres://{host}/databases/{dat
                     text: JSON.stringify(schema, null, 2),
                     mimeType: "application/json"
                 }]
+        };
+    }
+    finally {
+        client.release();
+    }
+});
+// Add a SQL query tool
+server.tool("query", "makes a query to the database", {
+    database: z.string().describe("The database to query"),
+    sql: z.string().describe("The SQL statement to execute")
+}, async ({ database, sql }) => {
+    const client = await pool.connect();
+    try {
+        // Set the database context
+        await client.query(`SET database = $1`, [database]);
+        const startTime = Date.now();
+        // Execute the query
+        const result = await client.query(sql);
+        const endTime = Date.now() - startTime;
+        // Format the results
+        const formattedResults = {
+            rowCount: result.rowCount,
+            fields: result.fields?.map(f => ({
+                name: f.name,
+                dataTypeID: f.dataTypeID
+            })),
+            rows: result.rows,
+            command: result.command,
+            duration: `${endTime}ms`
+        };
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `Query executed successfully in ${endTime}ms.`
+                },
+                {
+                    type: "text",
+                    text: JSON.stringify(formattedResults, null, 2)
+                }
+            ]
+        };
+    }
+    catch (error) {
+        // Handle query errors
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `Error executing query: ${error instanceof Error ? error.message : String(error)}`
+                }
+            ],
+            isError: true,
         };
     }
     finally {
