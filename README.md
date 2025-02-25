@@ -6,8 +6,8 @@ This MCP server connects to a CockroachDB instance, exposing database and table 
 
 ### Resources
 
-- `crdb://{host}/databases/{database}` - Get information about a specific database
-- `crdb://{host}/databases/{database}/tables/{table}/schema` - Get the schema for a specific table
+- `cockroachdb://{host}/databases/{database}` - Get information about a specific database
+- `cockroachdb://{host}/databases/{database}/tables/{table}/schema` - Get the schema for a specific table
 
 ### Tools
 
@@ -18,7 +18,7 @@ This MCP server connects to a CockroachDB instance, exposing database and table 
 1. Clone this repository
 2. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 3. Build the project:
    ```bash
