@@ -1,29 +1,17 @@
 # CockroachDB MCP Server
 
-This MCP server connects to a CockroachDB instance, exposing table schemas as resources, running read-only SQL queries as tools, and providing prompts for common data analysis tasks.
+This MCP server connects to a CockroachDB instance, exposing database and table schemas as resources, running SQL queries as tools, and providing prompts for query analysis.
 
 ## Features
 
 ### Resources
 
-- `db://tables` - List all tables in the database
-- `db://tables/{tableName}/schema` - Get the schema for a specific table
-- `db://tables/{tableName}/details` - Get detailed information about a table including indexes and primary keys
-- `db://tables/{tableName}/stats` - Get statistics about a table (row count, size)
+- `crdb://{host}/databases/{database}` - Get information about a specific database
+- `crdb://{host}/databases/{database}/tables/{table}/schema` - Get the schema for a specific table
 
 ### Tools
 
-- `execute-query` - Execute a read-only SQL query
-- `get-sample-data` - Get a sample of data from a table with options for limit and ordering
-- `count-rows` - Count the number of rows in a table with optional WHERE condition
-- `column-stats` - Generate statistics for a specific column (min, max, avg, etc.)
-
-### Prompts
-
-- `explore-table` - Generate a prompt to explore a database table
-- `generate-query` - Generate a prompt to get help writing an SQL query
-- `analyze-query-results` - Generate a prompt to analyze query results
-- `optimize-query` - Generate a prompt to optimize a SQL query
+- `query` - Execute a SQL query with options for execution plan analysis
 
 ## Installation
 
@@ -37,31 +25,14 @@ This MCP server connects to a CockroachDB instance, exposing table schemas as re
    npx tsc
    ```
 
+> **Note:** You must build the project with `tsc` before using the MCP server locally.
+
 ## Configuration
 
-Set the following environment variables to configure your CockroachDB connection:
-
-- `DB_USER`: Database user (default: 'root')
-- `DB_HOST`: Database host (default: 'localhost')
-- `DB_PORT`: Database port (default: '26257')
-- `DB_NAME`: Database name (default: 'defaultdb')
-- `DB_PASSWORD`: Database password (default: '')
-- `DB_SSL`: Whether to use SSL (default: 'false')
-
-Example:
-```bash
-export DB_USER=root
-export DB_HOST=localhost
-export DB_PORT=26257
-export DB_NAME=mydatabase
-export DB_PASSWORD=mypassword
-export DB_SSL=true
-```
-
-## Running the server
+The server requires a database URL as a command-line argument:
 
 ```bash
-node dist/server.js
+node dist/server.js postgres://user:password@host:port/database
 ```
 
 ## Using with Claude for Desktop
@@ -77,15 +48,7 @@ node dist/server.js
   "mcpServers": {
     "cockroachdb": {
       "command": "node",
-      "args": ["/path/to/cockroachdb-mcp-server/dist/server.js"],
-      "env": {
-        "DB_USER": "root",
-        "DB_HOST": "localhost",
-        "DB_PORT": "26257",
-        "DB_NAME": "mydatabase",
-        "DB_PASSWORD": "mypassword",
-        "DB_SSL": "false"
-      }
+      "args": ["/path/to/cockroachdb-mcp-server/dist/server.js", "postgres://user:password@host:port/database"]
     }
   }
 }
@@ -93,22 +56,43 @@ node dist/server.js
 
 3. Restart Claude for Desktop
 
+## Using with Cline
+
+1. Open your Cline configuration file from the extension settings under "MCP Servers". Select "Configure MCP Servers".
+
+2. Add your server configuration:
+
+```json
+{
+  "mcpServers": {
+    "crdb": {
+      "command": "node",
+      "args": [
+        "/path/to/cockroachdb-mcp-server/dist/server.js",
+        "postgres://root@127.0.0.1:26257/testdb"
+      ]
+    }
+  }
+}
+```
+
+3. Restart Cline or start a new session
+
 ## Example Queries
 
 Here are some example queries you can ask Claude:
 
-1. "What tables are available in my CockroachDB database?"
-2. "Can you show me the schema for the 'customers' table?"
-3. "How many orders do we have for customer ID 123?"
-4. "Write a query to find the top 10 products by revenue in the last month"
-5. "Analyze the results of this customer retention query"
+1. "What databases are available in my CockroachDB instance?"
+2. "Can you show me the schema for the 'users' table in the 'testdb' database?"
+3. "Run this query on my database: SELECT * FROM users LIMIT 10"
+4. "Debug this query and suggest improvements: SELECT * FROM orders WHERE customer_id = 123"
 
 ## Security Considerations
 
-This server only allows read-only (SELECT) queries for security reasons. Always deploy it in a secure environment and use a database user with appropriate permissions (read-only access if possible).
+Be careful when configuring database access. Consider using a read-only user for the connection if you only need to query data.
 
 ## Troubleshooting
 
 - If you encounter connection issues, verify your database credentials and ensure the CockroachDB instance is accessible from your machine.
 - For SQL errors, check the server logs for detailed error messages.
-- If Claude can't see the server, verify the claude_desktop_config.json is properly formatted and the path to the server.js file is correct.
+- If Claude can't see the server, verify the configuration file is properly formatted and the path to the server.js file is correct.

@@ -27,7 +27,7 @@ const pool = new pg.Pool({
 // Add a resource for listing databases
 server.resource(
   "databases",
-  new ResourceTemplate("postgres://{host}/databases/{database}", { list: async () => {
+  new ResourceTemplate("cockroachdb://{host}/databases/{database}", { list: async () => {
     const client = await pool.connect();
     try {
       const result = await client.query<{ name: string }>(
@@ -37,7 +37,7 @@ server.resource(
       );
       return {
         resources: result.rows.map(row => ({
-          uri: `postgres://${resourceBaseUrl.host}/databases/${row.name}`,
+          uri: `cockroachdb://${resourceBaseUrl.host}/databases/${row.name}`,
           name: `${row.name} database`,
           mimeType: "application/json"
         }))
@@ -105,7 +105,7 @@ server.resource(
 // Schema resource using CRDB catalog tables
 server.resource(
   "schema",
-  new ResourceTemplate("postgres://{host}/databases/{database}/tables/{table}/schema", { list: async () => {
+  new ResourceTemplate("cockroachdb://{host}/databases/{database}/tables/{table}/schema", { list: async () => {
     const client = await pool.connect();
     try {
       const result = await client.query<{ table_name: string; database_name: string }>(
@@ -116,7 +116,7 @@ server.resource(
       );
       return {
         resources: result.rows.map(row => ({
-          uri: `postgres://${resourceBaseUrl.host}/databases/${row.database_name}/tables/${row.table_name}/schema`,
+          uri: `cockroachdb://${resourceBaseUrl.host}/databases/${row.database_name}/tables/${row.table_name}/schema`,
           name: `${row.database_name}.${row.table_name} schema`,
           mimeType: "application/json"
         }))
