@@ -133,15 +133,17 @@ server.resource("schema", new ResourceTemplate("postgres://{host}/databases/{dat
 // Add a SQL query tool
 server.tool("query", "makes a query to the database", {
     database: z.string().describe("The database to query"),
-    sql: z.string().describe("The SQL statement to execute")
-}, async ({ database, sql }) => {
+    sql: z.string().describe("The SQL statement to execute"),
+    explainAnalyze: z.boolean().default(false).describe("When true, prefixes the query with EXPLAIN ANALYZE")
+}, async ({ database, sql, explainAnalyze }) => {
     const client = await pool.connect();
     try {
         // Set the database context
         await client.query(`SET database = $1`, [database]);
         const startTime = Date.now();
-        // Execute the query
-        const result = await client.query(sql);
+        // Execute the query, with EXPLAIN ANALYZE if requested
+        const queryToExecute = explainAnalyze ? `EXPLAIN ANALYZE ${sql}` : sql;
+        const result = await client.query(queryToExecute);
         const endTime = Date.now() - startTime;
         // Format the results
         const formattedResults = {
@@ -154,18 +156,38 @@ server.tool("query", "makes a query to the database", {
             command: result.command,
             duration: `${endTime}ms`
         };
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `Query executed successfully in ${endTime}ms.`
-                },
-                {
-                    type: "text",
-                    text: JSON.stringify(formattedResults, null, 2)
-                }
-            ]
-        };
+        // For EXPLAIN ANALYZE, format the output as text
+        if (explainAnalyze) {
+            // EXPLAIN ANALYZE typically returns rows with a single column containing the execution plan
+            const explainOutput = result.rows.map(row => row[Object.keys(row)[0]]).join('\n');
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Query execution plan generated in ${endTime}ms.`
+                    },
+                    {
+                        type: "text",
+                        text: explainOutput
+                    }
+                ]
+            };
+        }
+        else {
+            // Regular query results
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Query executed successfully in ${endTime}ms.`
+                    },
+                    {
+                        type: "text",
+                        text: JSON.stringify(formattedResults, null, 2)
+                    }
+                ]
+            };
+        }
     }
     catch (error) {
         // Handle query errors
