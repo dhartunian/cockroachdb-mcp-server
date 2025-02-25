@@ -2,6 +2,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod"; // Add zod import for schema validation
 import pg from 'pg';
+import fetch from 'node-fetch'; // You'll need to add this dependency
 
 const server = new McpServer({
   name: "cockroachdb",
@@ -15,6 +16,8 @@ if (args.length === 0) {
 }
 
 const databaseUrl = args[0];
+// Get auth token from command line arguments (optional)
+const authToken = args[1] || '';
 
 const resourceBaseUrl = new URL(databaseUrl);
 resourceBaseUrl.protocol = "postgres:";
@@ -249,6 +252,86 @@ server.tool("query",
       };
     } finally {
       client.release();
+    }
+  }
+);
+
+// Add a new resource for cluster metadata
+server.resource(
+  "cluster-metadata",
+  new ResourceTemplate("postgres://{host}/cluster-metadata/{resource}", { 
+    list: async () => {
+      return {
+        resources: [
+          {
+            uri: `postgres://${resourceBaseUrl.host}/cluster-metadata/nodes`,
+            name: "Cluster node metadata, store information, topology, metric snapshots, etc.",
+            mimeType: "application/json"
+          }
+        ]
+      };
+    }
+  }),
+  async (uri, params) => {
+    // Check if auth token is provided
+    if (!authToken) {
+      return {
+        contents: [{
+          uri: uri.href,
+          text: JSON.stringify({ error: "Auth token is required for accessing cluster metadata" }, null, 2),
+          mimeType: "application/json"
+        }]
+      };
+    }
+
+    try {
+      // Extract the resource name from params
+      const { resource } = params;
+      
+      if (resource === 'nodes') {
+        // Make HTTP request to the CockroachDB admin UI API
+        const apiUrl = `http://${resourceBaseUrl.hostname}:8080/_status/nodes_ui`;
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Cookie': `session="${authToken},system"; tenant=system`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        return {
+          contents: [{
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: "application/json"
+          }]
+        };
+      } else {
+        return {
+          contents: [{
+            uri: uri.href,
+            text: JSON.stringify({ error: `Unknown resource: ${resource}` }, null, 2),
+            mimeType: "application/json"
+          }]
+        };
+      }
+    } catch (error) {
+      return {
+        contents: [{
+          uri: uri.href,
+          text: JSON.stringify({ 
+            error: `Failed to fetch cluster metadata: ${error instanceof Error ? error.message : String(error)}` 
+          }, null, 2),
+          mimeType: "application/json"
+        }]
+      };
     }
   }
 );

@@ -9,11 +9,16 @@
     "start": "node dist/server.js",
     "dev": "tsc && node dist/server.js"
   },
-  "keywords": ["mcp", "cockroachdb", "database"],
+  "keywords": [
+    "mcp",
+    "cockroachdb",
+    "database"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.0",
+    "node-fetch": "^3.3.2",
     "pg": "^8.11.3",
     "zod": "^3.23.8"
   },

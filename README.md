@@ -6,8 +6,10 @@ This MCP server connects to a CockroachDB instance, exposing database and table 
 
 ### Resources
 
-- `cockroachdb://{host}/databases/{database}` - Get information about a specific database
-- `cockroachdb://{host}/databases/{database}/tables/{table}/schema` - Get the schema for a specific table
+- `postgres://{host}/databases/{database}` - Get information about a specific database
+- `postgres://{host}/databases/{database}/tables/{table}/schema` - Get the schema for a specific table
+- `postgres://{host}/cluster-metadata/{resource}` - Get cluster metadata (requires auth token)
+  - Currently supports: `nodes` - Information about cluster nodes
 
 ### Tools
 
@@ -29,11 +31,13 @@ This MCP server connects to a CockroachDB instance, exposing database and table 
 
 ## Configuration
 
-The server requires a database URL as a command-line argument:
+The server requires a database URL as a command-line argument and optionally accepts an auth token for accessing admin UI endpoints:
 
 ```bash
-node dist/server.js postgres://user:password@host:port/database
+node dist/server.js postgres://user:password@host:port/database [auth_token]
 ```
+
+The auth token is required for accessing cluster metadata resources.
 
 ## Using with Claude for Desktop
 
@@ -48,7 +52,11 @@ node dist/server.js postgres://user:password@host:port/database
   "mcpServers": {
     "cockroachdb": {
       "command": "node",
-      "args": ["/path/to/cockroachdb-mcp-server/dist/server.js", "postgres://user:password@host:port/database"]
+      "args": [
+        "/path/to/cockroachdb-mcp-server/dist/server.js", 
+        "postgres://user:password@host:port/database",
+        "your_auth_token"
+      ]
     }
   }
 }
@@ -69,7 +77,8 @@ node dist/server.js postgres://user:password@host:port/database
       "command": "node",
       "args": [
         "/path/to/cockroachdb-mcp-server/dist/server.js",
-        "postgres://root@127.0.0.1:26257/testdb"
+        "postgres://root@127.0.0.1:26257/testdb",
+        "your_auth_token"
       ]
     }
   }
@@ -86,13 +95,16 @@ Here are some example queries you can ask Claude:
 2. "Can you show me the schema for the 'users' table in the 'testdb' database?"
 3. "Run this query on my database: SELECT * FROM users LIMIT 10"
 4. "Debug this query and suggest improvements: SELECT * FROM orders WHERE customer_id = 123"
+5. "Show me information about all nodes in my CockroachDB cluster"
 
 ## Security Considerations
 
-Be careful when configuring database access. Consider using a read-only user for the connection if you only need to query data.
+- Be careful when configuring database access. Consider using a read-only user for the connection if you only need to query data.
+- The auth token is used to access the CockroachDB admin UI API. Make sure to keep this token secure.
 
 ## Troubleshooting
 
 - If you encounter connection issues, verify your database credentials and ensure the CockroachDB instance is accessible from your machine.
 - For SQL errors, check the server logs for detailed error messages.
 - If Claude can't see the server, verify the configuration file is properly formatted and the path to the server.js file is correct.
+- For cluster metadata resources, ensure you've provided a valid auth token and that the admin UI is accessible on port 8080.
